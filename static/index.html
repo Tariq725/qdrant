@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CSV Semantic Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .section {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .result {
+            border: 1px solid #eee;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0;
+            box-sizing: border-box;
+        }
+        .info {
+            background-color: #e7f3fe;
+            border-left: 6px solid #2196F3;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .success {
+            background-color: #e7f3e8;
+            border-left: 6px solid #4CAF50;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .options {
+            background-color: #f9f9f9;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+        }
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            margin-top: 10px;
+        }
+        .range-value {
+            margin-top: 5px;
+            text-align: center;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            margin-left: 5px;
+            cursor: help;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #555;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        .match-details {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            padding: 8px;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .boost-info {
+            color: #2196F3;
+            font-style: italic;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>CSV Semantic Search</h1>
+    
+    <div class="container">
+        <div class="section">
+            <h2>Step 1: Upload CSV</h2>
+            <p class="info">Upload a CSV file. The first column will be used for semantic search.</p>
+            
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="csvFile" accept=".csv" required>
+                <button type="submit">Upload and Process</button>
+            </form>
+            <div id="uploadResult"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 2: Semantic Search</h2>
+            <form id="searchForm">
+                <input type="text" id="collectionId" placeholder="Collection ID" required>
+                <textarea id="queryInput" placeholder="Enter your search query" rows="3" required></textarea>
+                <input type="number" id="topK" placeholder="Number of results" value="5" min="1" max="20">
+                
+                <div class="options">
+                    <h3>Advanced Options</h3>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="enableFuzzy" checked>
+                        <label for="enableFuzzy">Enable typo tolerance (fuzzy matching)</label>
+                        <div class="tooltip">ⓘ
+                            <span class="tooltiptext">
+                                When enabled, the search will find results even when you have typos in your query. 
+                                The system will intelligently boost scores for documents that match similar words.
+                                <br><br>
+                                Example: Searching for "reccomendation" will also match "recommendation" with a boosted score.
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="slider-container">
+                        <label for="fuzzyThreshold">Fuzzy matching threshold:</label>
+                        <input type="range" id="fuzzyThreshold" min="0.5" max="0.9" value="0.7" step="0.05">
+                        <div class="range-value" id="thresholdValue">0.7</div>
+                        <div class="tooltip">ⓘ
+                            <span class="tooltiptext">
+                                Controls how similar words need to be to be considered a match:<br>
+                                - Higher values (0.8-0.9): Stricter matching, only very similar words<br>
+                                - Medium values (0.7): Balanced approach<br>
+                                - Lower values (0.5-0.6): More lenient matching, captures more variations but might include unrelated terms
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="slider-container">
+                        <label for="hybridWeight">Search balance:</label>
+                        <input type="range" id="hybridWeight" min="0" max="1" value="0.5" step="0.1">
+                        <div class="range-value" id="hybridWeightValue">0.5</div>
+                        <div class="tooltip">ⓘ
+                            <span class="tooltiptext">
+                                Controls the balance between keyword search and semantic search:<br>
+                                - 0: Pure keyword search (exact matches)<br>
+                                - 0.5: Balanced hybrid search<br>
+                                - 1: Pure semantic search (meaning)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit">Search</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Results</h2>
+            <div id="searchResults"></div>
+            <div id="matchDetails" class="match-details" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Show the current threshold value
+        const thresholdSlider = document.getElementById('fuzzyThreshold');
+        const thresholdValue = document.getElementById('thresholdValue');
+        thresholdSlider.addEventListener('input', () => {
+            thresholdValue.textContent = thresholdSlider.value;
+        });
+        
+        // Show the current hybrid weight value
+        const hybridSlider = document.getElementById('hybridWeight');
+        const hybridValue = document.getElementById('hybridWeightValue');
+        hybridSlider.addEventListener('input', () => {
+            hybridValue.textContent = hybridSlider.value;
+        });
+        
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a CSV file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                document.getElementById('uploadResult').innerHTML = '<p>Uploading and processing CSV...</p>';
+                
+                const response = await fetch('/upload-csv/', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                const result = await response.json();
+                if (result.error) {
+                    document.getElementById('uploadResult').innerHTML = `<p>Error: ${result.error}</p>`;
+                    return;
+                }
+                
+                let tableHtml = `
+                    <div class="success">
+                        <p>CSV file uploaded and processed successfully!</p>
+                        <p><strong>Collection ID:</strong> ${result.collection_id}</p>
+                        <p><strong>Documents processed:</strong> ${result.document_count}</p>
+                        <p>Use the Collection ID above for searching.</p>
+                    </div>
+                `;
+                
+                if (result.sample_documents && result.sample_documents.length > 0) {
+                    tableHtml += '<p><strong>Sample of processed documents:</strong></p>';
+                    tableHtml += '<table><tr><th>Content</th></tr>';
+                    result.sample_documents.forEach(doc => {
+                        tableHtml += `<tr><td>${doc}</td></tr>`;
+                    });
+                    tableHtml += '</table>';
+                }
+                
+                document.getElementById('uploadResult').innerHTML = tableHtml;
+                document.getElementById('collectionId').value = result.collection_id;
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('uploadResult').innerHTML = `<p>Error uploading file: ${error.message}</p>`;
+            }
+        });
+
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const collectionId = document.getElementById('collectionId').value;
+            const query = document.getElementById('queryInput').value;
+            const topK = document.getElementById('topK').value;
+            const enableFuzzy = document.getElementById('enableFuzzy').checked;
+            const fuzzyThreshold = document.getElementById('fuzzyThreshold').value;
+            const hybridWeight = document.getElementById('hybridWeight').value;
+            
+            if (!collectionId || !query) {
+                alert('Please enter both collection ID and query');
+                return;
+            }
+            
+            try {
+                document.getElementById('searchResults').innerHTML = '<p>Searching...</p>';
+                document.getElementById('matchDetails').style.display = 'none';
+                
+                const response = await fetch('/search/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        collection_id: collectionId,
+                        query_text: query,
+                        top_k: parseInt(topK),
+                        fuzzy_threshold: enableFuzzy ? parseFloat(fuzzyThreshold) : 1.0,
+                        hybrid_weight: parseFloat(hybridWeight)
+                    }),
+                });
+                
+                const result = await response.json();
+                if (result.detail) {
+                    document.getElementById('searchResults').innerHTML = `<p>Error: ${result.detail}</p>`;
+                    return;
+                }
+                
+                if (result.results.length === 0) {
+                    document.getElementById('searchResults').innerHTML = '<p>No results found for your query.</p>';
+                    return;
+                }
+                
+                const resultsHtml = result.results.map((item, index) => `
+                    <div class="result">
+                        <h3>Result ${index + 1}</h3>
+                        <p>${item.content}</p>
+                        <p style="color: #888;">Normalized Score: ${item.score.toFixed(4)} (Raw Score: ${item.raw_score.toFixed(4)})</p>
+                    </div>
+                `).join('');
+                
+                document.getElementById('searchResults').innerHTML = resultsHtml;
+                if (enableFuzzy && result.diagnostics && 
+                    result.diagnostics.original_query !== result.diagnostics.expanded_query) {
+                    document.getElementById('matchDetails').style.display = 'block';
+                    document.getElementById('matchDetails').innerHTML = `
+                        <h3>Query Expansion Details</h3>
+                        <p><strong>Original Query:</strong> ${result.diagnostics.original_query}</p>
+                        <p><strong>Expanded Query:</strong> ${result.diagnostics.expanded_query}</p>
+                        <p class="boost-info">* Scores have been boosted for documents that match similar words</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('searchResults').innerHTML = `<p>Error searching: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html> 

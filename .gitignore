@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -15,28 +16,23 @@ lib64/
 parts/
 sdist/
 var/
-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
 # Virtual Environment
 venv/
-env/
 ENV/
-env.bak/
-venv.bak/
 
-# IDEs and editors
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# OS specific
 .DS_Store
-.env
+Thumbs.db
 
 # Application specific
-*.csv
-collections/
-uploads/
-*.pkl
+# No specific files to ignore for this application
